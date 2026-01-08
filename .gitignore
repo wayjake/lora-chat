@@ -1,0 +1,41 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# VSCode / Cursor
+.vscode/
+*.code-workspace
+
+# Compiled files
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+
+# Build directories
+build/
+cmake-build-*/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.idea/
+*.iml
+
+# Wokwi
+.wokwi/
+
+# Logs
+*.log
+
+# Secrets (if any)
+secrets.h
+credentials.h
+.env

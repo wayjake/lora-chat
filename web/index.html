@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoRa Mesh Controller</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e0e0e0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #00d4ff;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      color: #888;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff4444;
+      transition: background 0.3s;
+    }
+
+    .status-dot.connected {
+      background: #00ff88;
+      box-shadow: 0 0 10px #00ff88;
+    }
+
+    button {
+      background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      width: 100%;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+    }
+
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    button.danger {
+      background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+    }
+
+    .device-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .device-info div {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    .device-info label {
+      display: block;
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .device-info span {
+      font-size: 0.9rem;
+      color: #fff;
+    }
+
+    .message-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    input, select {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 12px;
+      border-radius: 8px;
+      color: white;
+      font-size: 1rem;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #00d4ff;
+    }
+
+    .log {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      padding: 15px;
+      height: 200px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 0.85rem;
+    }
+
+    .log-entry {
+      margin-bottom: 5px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .log-entry.tx { color: #00d4ff; }
+    .log-entry.rx { color: #00ff88; }
+    .log-entry.error { color: #ff4444; }
+    .log-entry.system { color: #ffaa00; }
+
+    .role-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .role-buttons button {
+      flex: 1;
+      padding: 8px;
+      font-size: 0.85rem;
+    }
+
+    .role-buttons button.active {
+      background: #00ff88;
+      color: #1a1a2e;
+    }
+
+    .devices-list {
+      margin-top: 15px;
+    }
+
+    .device-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .device-item .name { font-weight: bold; }
+    .device-item .id { font-size: 0.75rem; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>LoRa Mesh Controller</h1>
+
+    <!-- Connection Card -->
+    <div class="card">
+      <h2>Connection</h2>
+      <div class="status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Disconnected</span>
+      </div>
+      <button id="connectBtn" onclick="toggleConnection()">Connect to Device</button>
+    </div>
+
+    <!-- Device Info Card -->
+    <div class="card" id="deviceCard" style="display: none;">
+      <h2>Connected Device</h2>
+      <div class="device-info">
+        <div>
+          <label>Device ID</label>
+          <span id="deviceId">-</span>
+        </div>
+        <div>
+          <label>Name</label>
+          <span id="deviceName">-</span>
+        </div>
+        <div>
+          <label>Role</label>
+          <span id="deviceRole">-</span>
+        </div>
+        <div>
+          <label>Signal</label>
+          <span id="deviceSignal">-</span>
+        </div>
+      </div>
+      <div class="role-buttons">
+        <button onclick="setRole(0)" id="roleBtn0">Standalone</button>
+        <button onclick="setRole(1)" id="roleBtn1">Parent</button>
+        <button onclick="setRole(2)" id="roleBtn2">Child</button>
+      </div>
+    </div>
+
+    <!-- Messaging Card -->
+    <div class="card" id="messageCard" style="display: none;">
+      <h2>LoRa Messaging</h2>
+      <div class="message-input">
+        <input type="text" id="messageInput" placeholder="Enter message..." onkeypress="if(event.key==='Enter')sendLoraMessage()">
+        <button onclick="sendLoraMessage()" style="width: auto; padding: 12px 20px;">Send</button>
+      </div>
+      <button class="secondary" onclick="pingDevice()">Ping Device</button>
+    </div>
+
+    <!-- Child Devices Card (Parent Mode) -->
+    <div class="card" id="childrenCard" style="display: none;">
+      <h2>Connected Devices</h2>
+      <div class="devices-list" id="devicesList">
+        <p style="color: #888; text-align: center;">No child devices connected</p>
+      </div>
+    </div>
+
+    <!-- Log Card -->
+    <div class="card">
+      <h2>Communication Log</h2>
+      <div class="log" id="log"></div>
+      <button class="secondary" onclick="clearLog()" style="margin-top: 10px;">Clear Log</button>
+    </div>
+  </div>
+
+  <script>
+    // BLE Configuration - must match ESP32
+    const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+    const CHAR_TX_UUID = '12345678-1234-1234-1234-123456789abd';
+    const CHAR_RX_UUID = '12345678-1234-1234-1234-123456789abe';
+    const CHAR_DEVICE_INFO_UUID = '12345678-1234-1234-1234-123456789abf';
+
+    // State
+    let device = null;
+    let server = null;
+    let txCharacteristic = null;
+    let rxCharacteristic = null;
+    let deviceInfoCharacteristic = null;
+    let connected = false;
+    let currentRole = 0;
+
+    const roleNames = ['Standalone', 'Parent', 'Child'];
+
+    // Logging
+    function log(message, type = 'system') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const time = new Date().toLocaleTimeString();
+      entry.textContent = `[${time}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    // UI Updates
+    function updateUI() {
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      const connectBtn = document.getElementById('connectBtn');
+      const deviceCard = document.getElementById('deviceCard');
+      const messageCard = document.getElementById('messageCard');
+      const childrenCard = document.getElementById('childrenCard');
+
+      if (connected) {
+        statusDot.classList.add('connected');
+        statusText.textContent = 'Connected';
+        connectBtn.textContent = 'Disconnect';
+        connectBtn.classList.add('danger');
+        deviceCard.style.display = 'block';
+        messageCard.style.display = 'block';
+        childrenCard.style.display = currentRole === 1 ? 'block' : 'none';
+      } else {
+        statusDot.classList.remove('connected');
+        statusText.textContent = 'Disconnected';
+        connectBtn.textContent = 'Connect to Device';
+        connectBtn.classList.remove('danger');
+        deviceCard.style.display = 'none';
+        messageCard.style.display = 'none';
+        childrenCard.style.display = 'none';
+      }
+
+      // Update role buttons
+      for (let i = 0; i < 3; i++) {
+        const btn = document.getElementById(`roleBtn${i}`);
+        btn.classList.toggle('active', i === currentRole);
+      }
+    }
+
+    function updateDeviceInfo(info) {
+      document.getElementById('deviceId').textContent = info.id || '-';
+      document.getElementById('deviceName').textContent = info.name || '-';
+      document.getElementById('deviceRole').textContent = roleNames[info.role] || '-';
+      currentRole = info.role || 0;
+      updateUI();
+    }
+
+    // BLE Connection
+    async function toggleConnection() {
+      if (connected) {
+        disconnect();
+      } else {
+        await connect();
+      }
+    }
+
+    async function connect() {
+      try {
+        log('Scanning for devices...');
+
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: 'LoRaMesh' }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        log(`Found device: ${device.name}`);
+
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+
+        log('Connecting to GATT server...');
+        server = await device.gatt.connect();
+
+        log('Getting service...');
+        const service = await server.getPrimaryService(SERVICE_UUID);
+
+        log('Getting characteristics...');
+        txCharacteristic = await service.getCharacteristic(CHAR_TX_UUID);
+        rxCharacteristic = await service.getCharacteristic(CHAR_RX_UUID);
+        deviceInfoCharacteristic = await service.getCharacteristic(CHAR_DEVICE_INFO_UUID);
+
+        // Subscribe to notifications
+        await txCharacteristic.startNotifications();
+        txCharacteristic.addEventListener('characteristicvaluechanged', onTxNotification);
+
+        connected = true;
+        log('Connected successfully!', 'rx');
+        updateUI();
+
+        // Request device info
+        setTimeout(() => sendCommand('getInfo'), 500);
+
+      } catch (error) {
+        log(`Connection failed: ${error.message}`, 'error');
+        console.error(error);
+      }
+    }
+
+    function disconnect() {
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+      }
+    }
+
+    function onDisconnected() {
+      connected = false;
+      log('Device disconnected', 'error');
+      updateUI();
+    }
+
+    function onTxNotification(event) {
+      const value = new TextDecoder().decode(event.target.value);
+      log(`← ${value}`, 'rx');
+
+      try {
+        const data = JSON.parse(value);
+        if (data.type === 'info' || data.type === 'pong') {
+          updateDeviceInfo(data);
+        }
+      } catch (e) {
+        // Not JSON, just log it
+      }
+    }
+
+    // Commands
+    async function sendCommand(cmd, data = null) {
+      if (!connected || !rxCharacteristic) {
+        log('Not connected', 'error');
+        return;
+      }
+
+      const message = data !== null
+        ? `{"cmd":"${cmd}","data":${typeof data === 'string' ? `"${data}"` : data}}`
+        : `{"cmd":"${cmd}"}`;
+
+      log(`→ ${message}`, 'tx');
+
+      const encoder = new TextEncoder();
+      await rxCharacteristic.writeValue(encoder.encode(message));
+    }
+
+    async function pingDevice() {
+      await sendCommand('ping');
+    }
+
+    async function setRole(role) {
+      await sendCommand('setRole', role);
+      setTimeout(() => sendCommand('getInfo'), 200);
+    }
+
+    async function sendLoraMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      if (message) {
+        await sendCommand('sendLora', message);
+        input.value = '';
+      }
+    }
+
+    // Check Web Bluetooth support
+    if (!navigator.bluetooth) {
+      log('Web Bluetooth is not supported in this browser!', 'error');
+      log('Use Chrome/Edge on desktop or Chrome on Android', 'error');
+      document.getElementById('connectBtn').disabled = true;
+    }
+  </script>
+</body>
+</html>
